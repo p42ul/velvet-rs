@@ -1,18 +1,25 @@
-use dasp::Sample;
+use dasp::{sample::FromSample, Sample};
 use hound;
-use rand::random;
+use rand::{distributions::Standard, prelude::Distribution, random};
 
-// If it's good enough for STK, it's good enough for us.
-type MySample = f64;
+const SAMPLE_RATE: u32 = 44_100;
 
-pub fn white_noise(len: usize) -> Vec<MySample> {
-    return (0..len).map(|_| random::<MySample>()).collect();
+pub fn white_noise<S>(len: usize) -> Vec<S>
+where
+    S: Sample,
+    Standard: Distribution<S>,
+{
+    return (0..len).map(|_| random::<S>()).collect();
 }
 
-pub fn output_wav(filename: String, buffer: &Vec<MySample>) -> Result<(), hound::Error> {
+pub fn output_wav<S>(filename: String, buffer: &Vec<S>) -> Result<(), hound::Error>
+where
+    S: Sample,
+    i16: FromSample<S>,
+{
     let spec = hound::WavSpec {
         channels: 1,
-        sample_rate: 44100,
+        sample_rate: SAMPLE_RATE,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
@@ -23,7 +30,5 @@ pub fn output_wav(filename: String, buffer: &Vec<MySample>) -> Result<(), hound:
     }
 
     writer.finalize()?;
-
-    println!("WAV file created");
     Ok(())
 }
