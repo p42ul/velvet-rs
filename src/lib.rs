@@ -14,7 +14,29 @@ where
     return (0..len).map(|_| random::<S>()).collect();
 }
 
-pub fn naive_convolve(s1: Vec<f32>, s2: Vec<f32>) -> Vec<f32> {
+pub fn naive_convolve<S>(s1: &Vec<S>, s2: &Vec<S>) -> Vec<S>
+where
+    S: Sample,
+{
+    let (big, small) = if s1.len() > s2.len() {
+        (s1, s2)
+    } else {
+        (s2, s1)
+    };
+    let (len_big, len_small) = (big.len(), small.len());
+    let mut output: Vec<S> = vec![S::EQUILIBRIUM; len_big];
+    for i in 0..len_big {
+        for j in 0..len_small {
+            let big_signal = s1.get(i+j).unwrap_or(&S::EQUILIBRIUM).to_float_sample();
+            let small_signal = s2.get(j).unwrap_or(&S::EQUILIBRIUM).to_float_sample();
+            let product = big_signal.mul_amp(small_signal);
+            output[i] = output[i].add_amp(product.to_sample::<S>().to_signed_sample());
+        }
+    }
+    output
+}
+
+pub fn fft_convolve(s1: Vec<f32>, s2: Vec<f32>) -> Vec<f32> {
     let (big, mut small) = if s1.len() > s2.len() {
         (s1, s2)
     } else {
