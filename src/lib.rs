@@ -23,13 +23,22 @@ where
     } else {
         (s2, s1)
     };
-    let (len_big, len_small) = (big.len(), small.len());
-    let mut output: Vec<S> = vec![S::EQUILIBRIUM; len_big];
-    for i in 0..len_big {
-        for j in 0..len_small {
-            let big_signal = s1.get(i+j).unwrap_or(&S::EQUILIBRIUM).to_float_sample();
-            let small_signal = s2.get(j).unwrap_or(&S::EQUILIBRIUM).to_float_sample();
-            let product = big_signal.mul_amp(small_signal);
+    let mut output: Vec<S> = vec![S::EQUILIBRIUM; big.len()+small.len()-1];
+    for i in 0..output.len() {
+        for j in 0..small.len() {
+            let x_index = match i.checked_sub(j) {
+                Some(val) => val,
+                None => continue,
+            };
+            let x = match big.get(x_index) {
+                Some(val) => val,
+                None => continue,
+            };
+            let h = match small.get(j) {
+                Some(val) => val,
+                None => continue
+            };
+            let product = x.mul_amp(h.to_float_sample());
             output[i] = output[i].add_amp(product.to_sample::<S>().to_signed_sample());
         }
     }
