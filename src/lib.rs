@@ -1,8 +1,7 @@
 use dasp::{sample::FromSample, Sample};
-use easyfft::prelude::*;
+use easyfft::{prelude::*, FftNum, dyn_size::realfft::DynRealDft};
 use hound;
 use rand::{distributions::Standard, prelude::Distribution, random};
-
 
 const SAMPLE_RATE: u32 = 44_100;
 
@@ -23,7 +22,7 @@ where
     } else {
         (s2, s1)
     };
-    let mut output: Vec<S> = vec![S::EQUILIBRIUM; big.len()+small.len()-1];
+    let mut output: Vec<S> = vec![S::EQUILIBRIUM; big.len() + small.len() - 1];
     for i in 0..output.len() {
         for j in 0..small.len() {
             let x_index = match i.checked_sub(j) {
@@ -36,7 +35,7 @@ where
             };
             let h = match small.get(j) {
                 Some(val) => val,
-                None => continue
+                None => continue,
             };
             let product = x.mul_amp(h.to_float_sample());
             output[i] = output[i].add_amp(product.to_sample::<S>().to_signed_sample());
@@ -45,23 +44,26 @@ where
     output
 }
 
-pub fn fft_convolve(s1: Vec<f32>, s2: Vec<f32>) -> Vec<f32> {
-    let (big, mut small) = if s1.len() > s2.len() {
+pub fn fft_convolve<S>(s1: &Vec<S>, s2: &Vec<S>) -> Vec<S>
+where
+    S: Sample + FftNum + Default + FromSample<f32>,
+{
+    let (big, small) = if s1.len() > s2.len() {
         (s1, s2)
     } else {
         (s2, s1)
     };
-    let signal_length = big.len();
-    small.resize(signal_length, 0.0);
+    let mut big = big.clone();
+    let mut small = small.clone();
+    let output_length = big.len() + small.len() - 1;
+    big.resize(output_length, S::EQUILIBRIUM);
+    small.resize(output_length, S::EQUILIBRIUM);
     let big_dft = &big[..].real_fft();
     let small_dft = &small[..].real_fft();
-    let idft = big_dft * small_dft;
-    let output = idft.real_ifft();
-    return output
-        .to_vec()
-        .iter()
-        .map(|x| x / signal_length as f32)
-        .collect();
+    let mult: DynRealDft<S> = big_dft * small_dft;
+    let output = mult.real_ifft();
+    let divisor = (output_length as f32).to_sample::<S>();
+    output.to_vec().iter().map(|&x| x / divisor).collect()
 }
 
 pub fn read_wav<S>(filename: String) -> Result<Vec<S>, hound::Error>
