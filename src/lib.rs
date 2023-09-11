@@ -1,7 +1,7 @@
 use dasp::{sample::FromSample, Sample};
 use easyfft::{prelude::*, FftNum, dyn_size::realfft::DynRealDft};
 use hound;
-use rand::{distributions::Standard, prelude::Distribution, random};
+use rand::{distributions::Standard, prelude::Distribution, Rng};
 
 const SAMPLE_RATE: u32 = 44_100;
 
@@ -10,7 +10,27 @@ where
     S: Sample,
     Standard: Distribution<S>,
 {
-    return (0..len).map(|_| random::<S>()).collect();
+    let mut rng = rand::thread_rng();
+    return (0..len).map(|_| rng.gen::<S>()).collect();
+}
+
+pub fn velvet_noise(len: usize, density: u32, sample_rate: u32) -> Vec<f32>
+{
+    let mut rng = rand::thread_rng();
+    let pulse_distance = sample_rate / density;
+    let mut output: Vec<f32> = vec![0.0; len];
+    //pulse locations: k(m) = round[mTd + r1(m)(Td − 1)]
+    for m in 0..len / pulse_distance as usize {
+        let location = (m * pulse_distance as usize) + if m == 0 {0} else {rng.gen_range(0..m)} * (pulse_distance - 1) as usize;
+        if location >= output.len() {
+            break;
+        }
+        output[location] = match rng.gen::<bool>() {
+            true => 1.0,
+            false => -1.0,
+        };
+    }
+    output
 }
 
 pub fn naive_convolve<S>(s1: &Vec<S>, s2: &Vec<S>) -> Vec<S>
