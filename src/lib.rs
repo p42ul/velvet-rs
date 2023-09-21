@@ -21,7 +21,7 @@ pub fn velvet_noise(len: usize, density: u32, sample_rate: u32) -> Vec<f32>
     let mut output: Vec<f32> = vec![0.0; len];
     //pulse locations: k(m) = round[mTd + r1(m)(Td − 1)]
     for m in 0..len / pulse_distance as usize {
-        let location = (m * pulse_distance as usize) + if m == 0 {0} else {rng.gen_range(0..m)} * (pulse_distance - 1) as usize;
+        let location = (m * pulse_distance as usize) + (rng.gen::<f32>() * (pulse_distance - 1) as f32) as usize;
         if location >= output.len() {
             break;
         }
