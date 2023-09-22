@@ -1,17 +1,14 @@
-use dasp::{sample::FromSample, Sample};
-use easyfft::{prelude::*, FftNum, dyn_size::realfft::DynRealDft};
+use easyfft::{prelude::*, dyn_size::realfft::DynRealDft};
 use hound;
-use rand::{distributions::Standard, prelude::Distribution, Rng};
+use hound::Sample;
+use rand::Rng;
 
 const SAMPLE_RATE: u32 = 44_100;
 
-pub fn white_noise<S>(len: usize) -> Vec<S>
-where
-    S: Sample,
-    Standard: Distribution<S>,
+pub fn white_noise(len: usize) -> Vec<f32>
 {
     let mut rng = rand::thread_rng();
-    return (0..len).map(|_| rng.gen::<S>()).collect();
+    return (0..len).map(|_| rng.gen::<f32>()).collect();
 }
 
 pub fn velvet_noise(len: usize, density: u32, sample_rate: u32) -> Vec<f32>
@@ -33,16 +30,14 @@ pub fn velvet_noise(len: usize, density: u32, sample_rate: u32) -> Vec<f32>
     output
 }
 
-pub fn naive_convolve<S>(s1: &Vec<S>, s2: &Vec<S>) -> Vec<S>
-where
-    S: Sample,
+pub fn naive_convolve(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>
 {
     let (big, small) = if s1.len() > s2.len() {
         (s1, s2)
     } else {
         (s2, s1)
     };
-    let mut output: Vec<S> = vec![S::EQUILIBRIUM; big.len() + small.len() - 1];
+    let mut output: Vec<f32> = vec![0.0; big.len() + small.len() - 1];
     for i in 0..output.len() {
         for j in 0..small.len() {
             let x_index = match i.checked_sub(j) {
@@ -57,16 +52,14 @@ where
                 Some(val) => val,
                 None => continue,
             };
-            let product = x.mul_amp(h.to_float_sample());
-            output[i] = output[i].add_amp(product.to_sample::<S>().to_signed_sample());
+            let product = x * h;
+            output[i] += product;
         }
     }
     output
 }
 
-pub fn fft_convolve<S>(s1: &Vec<S>, s2: &Vec<S>) -> Vec<S>
-where
-    S: Sample + FftNum + Default + FromSample<f32>,
+pub fn fft_convolve(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>
 {
     let (big, small) = if s1.len() > s2.len() {
         (s1, s2)
@@ -76,31 +69,27 @@ where
     let mut big = big.clone();
     let mut small = small.clone();
     let output_length = big.len() + small.len() - 1;
-    big.resize(output_length, S::EQUILIBRIUM);
-    small.resize(output_length, S::EQUILIBRIUM);
+    big.resize(output_length, 0.0);
+    small.resize(output_length, 0.0);
     let big_dft = &big[..].real_fft();
     let small_dft = &small[..].real_fft();
-    let mult: DynRealDft<S> = big_dft * small_dft;
+    let mult: DynRealDft<f32> = big_dft * small_dft;
     let output = mult.real_ifft();
-    let divisor = (output_length as f32).to_sample::<S>();
-    output.to_vec().iter().map(|&x| x / divisor).collect()
+    output.to_vec().iter().map(|&x| x / output_length as f32).collect()
 }
 
 pub fn read_wav<S>(filename: String) -> Result<Vec<S>, hound::Error>
-where
-    S: Sample + FromSample<i16>,
+where S: Sample,
 {
     let mut reader = hound::WavReader::open(filename)?;
     return Ok(reader
-        .samples::<i16>()
-        .map(|s| s.unwrap().to_sample::<S>())
+        .samples()
+        .map(|s: Result<S, hound::Error>| s.unwrap())
         .collect());
 }
 
 pub fn output_wav<S>(filename: String, buffer: &Vec<S>) -> Result<(), hound::Error>
-where
-    S: Sample,
-    i16: FromSample<S>,
+where S: Sample + Clone,
 {
     let spec = hound::WavSpec {
         channels: 1,
@@ -110,8 +99,8 @@ where
     };
     let mut writer = hound::WavWriter::create(filename, spec)?;
 
-    for &sample in buffer.iter() {
-        writer.write_sample(sample.to_sample::<i16>())?;
+    for sample in buffer.iter() {
+        writer.write_sample(sample.clone().as_i16())?;
     }
 
     writer.finalize()
