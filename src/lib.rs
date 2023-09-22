@@ -5,27 +5,59 @@ use rand::Rng;
 
 const SAMPLE_RATE: u32 = 44_100;
 
+// Vector of (location, pulse_type)
+type SparseVelvet = Vec<(usize, bool)>;
+
 pub fn white_noise(len: usize) -> Vec<f32>
 {
     let mut rng = rand::thread_rng();
     return (0..len).map(|_| rng.gen::<f32>()).collect();
 }
 
+pub fn convolve_velvet(signal: &Vec<f32>, velvet_len: usize, density: u32, sample_rate: u32) -> Vec<f32>
+{
+    let velvet = gen_velvet(velvet_len, density, sample_rate);
+    let mut output: Vec<f32> = vec![0.0; signal.len() + velvet_len - 1];
+    for n in 0..output.len() {
+        for &(location, pulse_type) in velvet.iter() {
+            let location = match n.checked_sub(location) {
+                Some(val) => val,
+                None => break,
+            };
+            if location >= signal.len() {
+                break;
+            }
+            match pulse_type {
+                true =>  output[location] += signal[location],
+                false => output[location] -= signal[location],
+            };
+        }
+    }
+    output
+}
+
 pub fn velvet_noise(len: usize, density: u32, sample_rate: u32) -> Vec<f32>
+{
+    let mut output: Vec<f32> = vec![0.0; len];
+    let velvet = gen_velvet(len, density, sample_rate);
+    for &(location, pulse_type) in velvet.iter() {
+        output[location] = match pulse_type {
+            true => 1.0,
+            false => -1.0,
+        }
+    }
+    output
+}
+
+fn gen_velvet(len: usize, density: u32, sample_rate: u32) -> SparseVelvet
 {
     let mut rng = rand::thread_rng();
     let pulse_distance = sample_rate / density;
-    let mut output: Vec<f32> = vec![0.0; len];
+    let mut output: SparseVelvet = SparseVelvet::with_capacity(len / pulse_distance as usize);
     //pulse locations: k(m) = round[mTd + r1(m)(Td − 1)]
     for m in 0..len / pulse_distance as usize {
         let location = (m * pulse_distance as usize) + (rng.gen::<f32>() * (pulse_distance - 1) as f32) as usize;
-        if location >= output.len() {
-            break;
-        }
-        output[location] = match rng.gen::<bool>() {
-            true => 1.0,
-            false => -1.0,
-        };
+        output.push( (location, rng.gen::<bool>()));
     }
     output
 }
@@ -88,8 +120,7 @@ where S: Sample,
         .collect());
 }
 
-pub fn output_wav<S>(filename: String, buffer: &Vec<S>) -> Result<(), hound::Error>
-where S: Sample + Clone,
+pub fn output_wav(filename: String, buffer: &Vec<i16>) -> Result<(), hound::Error>
 {
     let spec = hound::WavSpec {
         channels: 1,
@@ -99,8 +130,8 @@ where S: Sample + Clone,
     };
     let mut writer = hound::WavWriter::create(filename, spec)?;
 
-    for sample in buffer.iter() {
-        writer.write_sample(sample.clone().as_i16())?;
+    for &sample in buffer.iter() {
+        writer.write_sample(sample)?;
     }
 
     writer.finalize()
