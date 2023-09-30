@@ -5,7 +5,8 @@ use rand::Rng;
 
 const SAMPLE_RATE: u32 = 44_100;
 
-// Vector of (location, pulse_type)
+// Vector of (pulse_location, pulse_type)
+// Pulse locations are monotonically increasing
 type SparseVelvet = Vec<(usize, bool)>;
 
 pub fn white_noise(len: usize) -> Vec<f32>
@@ -14,22 +15,22 @@ pub fn white_noise(len: usize) -> Vec<f32>
     return (0..len).map(|_| rng.gen::<f32>()).collect();
 }
 
-pub fn convolve_velvet(signal: &Vec<f32>, velvet_len: usize, density: u32, sample_rate: u32) -> Vec<f32>
+pub fn convolve_velvet(signal: &Vec<i16>, velvet_len: usize, density: u32, sample_rate: u32) -> Vec<i16>
 {
-    let velvet = gen_velvet(velvet_len, density, sample_rate);
-    let mut output: Vec<f32> = vec![0.0; signal.len() + velvet_len - 1];
+    println!("generating sparse velvet");
+    let velvet: SparseVelvet = gen_velvet(velvet_len, density, sample_rate);
+    println!("signal length: {} velvet length: {}", signal.len(), velvet_len);
+    let mut output: Vec<i16> = vec![0; signal.len() + velvet_len - 1];
+    println!("convolving");
     for n in 0..output.len() {
-        for &(location, pulse_type) in velvet.iter() {
-            let location = match n.checked_sub(location) {
-                Some(val) => val,
-                None => break,
-            };
-            if location >= signal.len() {
-                break;
+        for &(pulse_location, pulse_type) in velvet.iter() {
+            let Some(index) = n.checked_sub(pulse_location) else {continue;};
+            if index >= signal.len() {
+                continue;
             }
             match pulse_type {
-                true =>  output[location] += signal[location],
-                false => output[location] -= signal[location],
+                true =>  output[n] += signal[index],
+                false => output[n] -= signal[index],
             };
         }
     }
@@ -57,7 +58,7 @@ fn gen_velvet(len: usize, density: u32, sample_rate: u32) -> SparseVelvet
     //pulse locations: k(m) = round[mTd + r1(m)(Td − 1)]
     for m in 0..len / pulse_distance as usize {
         let location = (m * pulse_distance as usize) + (rng.gen::<f32>() * (pulse_distance - 1) as f32) as usize;
-        output.push( (location, rng.gen::<bool>()));
+        output.push((location, rng.gen::<bool>()));
     }
     output
 }
@@ -72,18 +73,9 @@ pub fn naive_convolve(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>
     let mut output: Vec<f32> = vec![0.0; big.len() + small.len() - 1];
     for i in 0..output.len() {
         for j in 0..small.len() {
-            let x_index = match i.checked_sub(j) {
-                Some(val) => val,
-                None => continue,
-            };
-            let x = match big.get(x_index) {
-                Some(val) => val,
-                None => continue,
-            };
-            let h = match small.get(j) {
-                Some(val) => val,
-                None => continue,
-            };
+            let Some(x_index) = i.checked_sub(j) else { continue; };
+            let Some(x) = big.get(x_index) else { continue; };
+            let Some(h) = small.get(j) else { continue; };
             let product = x * h;
             output[i] += product;
         }
