@@ -6,18 +6,15 @@ fn approx_eq(v1: &Vec<f32>, v2: &Vec<f32>, epsilon: f32) -> bool {
     if v1.len() != v2.len() {
         return false;
     }
-    let mut ret = true;
+    let mut ret: f32 = 0.0;
     for i in 0..v1.len() {
         let delta = v1[i] - v2[i];
-        if delta.abs() > epsilon {
-            println!("x: {}, y: {}, delta: {}", v1[i], v2[i], delta);
-            ret = false
-        }
+        ret = ret.max(delta);
     }
-    ret
+    println!("largest delta: {}", ret);
+    ret < epsilon
 }
 
-#[ignore]
 #[test]
 fn signal_velvet_equivalence() {
     let s1 = velvet_rs::read_wav::<i16>("triangle.wav".to_string()).unwrap()
@@ -28,7 +25,7 @@ fn signal_velvet_equivalence() {
     let s2 = velvet_rs::velvet_noise(&velvet);
     let fft_convolved = velvet_rs::convolve_fft(&s1, &s2);
     let velvet_convolved = velvet_rs::convolve_velvet(&s1, &velvet);
-    assert_eq!(fft_convolved, velvet_convolved);
+    assert!(approx_eq(&fft_convolved, &velvet_convolved, 1e-6));
 }
 
 #[test]
