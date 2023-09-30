@@ -5,9 +5,12 @@ use rand::Rng;
 
 const SAMPLE_RATE: u32 = 44_100;
 
-// Vector of (pulse_location, pulse_type)
-// Pulse locations are monotonically increasing
-type SparseVelvet = Vec<(usize, bool)>;
+pub struct SparseVelvet {
+    len: usize,
+    // Vector of (pulse_location, pulse_type)
+    // Pulse locations are monotonically increasing
+    pulses: Vec<(usize, bool)>,
+}
 
 pub fn white_noise(len: usize) -> Vec<f32>
 {
@@ -15,15 +18,13 @@ pub fn white_noise(len: usize) -> Vec<f32>
     return (0..len).map(|_| rng.gen::<f32>()).collect();
 }
 
-pub fn convolve_velvet(signal: &Vec<i16>, velvet_len: usize, density: u32, sample_rate: u32) -> Vec<i16>
+pub fn convolve_velvet(signal: &Vec<i16>, velvet: &SparseVelvet) -> Vec<i16>
 {
-    println!("generating sparse velvet");
-    let velvet: SparseVelvet = gen_velvet(velvet_len, density, sample_rate);
-    println!("signal length: {} velvet length: {}", signal.len(), velvet_len);
-    let mut output: Vec<i16> = vec![0; signal.len() + velvet_len - 1];
+    println!("signal length: {} velvet length: {}", signal.len(), velvet.len);
+    let mut output: Vec<i16> = vec![0; signal.len() + velvet.len - 1];
     println!("convolving");
     for n in 0..output.len() {
-        for &(pulse_location, pulse_type) in velvet.iter() {
+        for &(pulse_location, pulse_type) in velvet.pulses.iter() {
             let Some(index) = n.checked_sub(pulse_location) else {continue;};
             if index >= signal.len() {
                 continue;
@@ -37,11 +38,10 @@ pub fn convolve_velvet(signal: &Vec<i16>, velvet_len: usize, density: u32, sampl
     output
 }
 
-pub fn velvet_noise(len: usize, density: u32, sample_rate: u32) -> Vec<f32>
+pub fn velvet_noise(velvet: &SparseVelvet) -> Vec<f32>
 {
-    let mut output: Vec<f32> = vec![0.0; len];
-    let velvet = gen_velvet(len, density, sample_rate);
-    for &(location, pulse_type) in velvet.iter() {
+    let mut output: Vec<f32> = vec![0.0; velvet.len];
+    for &(location, pulse_type) in velvet.pulses.iter() {
         output[location] = match pulse_type {
             true => 1.0,
             false => -1.0,
@@ -50,17 +50,20 @@ pub fn velvet_noise(len: usize, density: u32, sample_rate: u32) -> Vec<f32>
     output
 }
 
-fn gen_velvet(len: usize, density: u32, sample_rate: u32) -> SparseVelvet
+pub fn gen_velvet(len: usize, density: u32, sample_rate: u32) -> SparseVelvet
 {
     let mut rng = rand::thread_rng();
     let pulse_distance = sample_rate / density;
-    let mut output: SparseVelvet = SparseVelvet::with_capacity(len / pulse_distance as usize);
+    let mut velvet = SparseVelvet {
+        len: len,
+        pulses: Vec::with_capacity(len / pulse_distance as usize),
+    };
     //pulse locations: k(m) = round[mTd + r1(m)(Td − 1)]
     for m in 0..len / pulse_distance as usize {
         let location = (m * pulse_distance as usize) + (rng.gen::<f32>() * (pulse_distance - 1) as f32) as usize;
-        output.push((location, rng.gen::<bool>()));
+        velvet.pulses.push((location, rng.gen::<bool>()));
     }
-    output
+    velvet
 }
 
 pub fn naive_convolve(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>

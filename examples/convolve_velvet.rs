@@ -3,11 +3,10 @@ extern crate velvet_rs;
 use dasp::Sample;
 
 fn main() {
-    println!("reading triangle.wav");
     let triangle = velvet_rs::read_wav::<i16>("triangle.wav".to_string()).unwrap();
     let sig_length = 44_100 * 5;
-    println!("convolving signal of length {}", sig_length);
-    let convolved = velvet_rs::convolve_velvet(&triangle, sig_length, 2205, 44_100);
+    let velvet = velvet_rs::gen_velvet(sig_length, 2205, 44_100);
+    let convolved = velvet_rs::convolve_velvet(&triangle, &velvet);
     println!("converting from f32 to i16");
     let convolved = convolved
         .iter()
