@@ -18,10 +18,10 @@ pub fn white_noise(len: usize) -> Vec<f32>
     return (0..len).map(|_| rng.gen::<f32>()).collect();
 }
 
-pub fn convolve_velvet(signal: &Vec<i16>, velvet: &SparseVelvet) -> Vec<i16>
+pub fn convolve_velvet(signal: &Vec<f32>, velvet: &SparseVelvet) -> Vec<f32>
 {
     println!("signal length: {} velvet length: {}", signal.len(), velvet.len);
-    let mut output: Vec<i16> = vec![0; signal.len() + velvet.len - 1];
+    let mut output: Vec<f32> = vec![0.; signal.len() + velvet.len - 1];
     println!("convolving");
     for n in 0..output.len() {
         for &(pulse_location, pulse_type) in velvet.pulses.iter() {
@@ -86,7 +86,7 @@ pub fn naive_convolve(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>
     output
 }
 
-pub fn fft_convolve(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>
+pub fn convolve_fft(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>
 {
     let (big, small) = if s1.len() > s2.len() {
         (s1, s2)
