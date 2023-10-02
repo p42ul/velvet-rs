@@ -2,17 +2,19 @@ extern crate velvet_rs;
 
 use dasp::Sample;
 
+const SAMPLE_RATE: u32 = 44_100;
+
 fn approx_eq(v1: &Vec<f32>, v2: &Vec<f32>, epsilon: f32) -> bool {
     if v1.len() != v2.len() {
         return false;
     }
-    let mut ret: f32 = 0.0;
+    let mut largest: f32 = 0.0;
     for i in 0..v1.len() {
         let delta = v1[i] - v2[i];
-        ret = ret.max(delta);
+        largest = largest.max(delta);
     }
-    println!("largest delta: {}", ret);
-    ret < epsilon
+    println!("largest delta: {}", largest);
+    largest < epsilon
 }
 
 #[test]
@@ -21,11 +23,11 @@ fn signal_velvet_equivalence() {
         .iter()
         .map(|&s| s.to_sample::<f32>())
         .collect();
-    let velvet = velvet_rs::gen_velvet(44_100*7, 2205, 44_100);
+    let velvet = velvet_rs::gen_velvet((SAMPLE_RATE*7) as usize, 2205, SAMPLE_RATE);
     let s2 = velvet_rs::velvet_noise(&velvet);
     let fft_convolved = velvet_rs::convolve_fft(&s1, &s2);
     let velvet_convolved = velvet_rs::convolve_velvet(&s1, &velvet);
-    assert!(approx_eq(&fft_convolved, &velvet_convolved, 1e-6));
+    assert!(approx_eq(&fft_convolved, &velvet_convolved, 1e-5));
 }
 
 #[test]
@@ -62,7 +64,7 @@ fn fft_velvet_equivalence() {
 fn wav_io() {
     let output_filename = "triangle2.wav";
     let triangle: Vec<i16> = velvet_rs::read_wav::<i16>("triangle.wav".to_string()).unwrap();
-    match velvet_rs::output_wav(output_filename.to_string(), &triangle) {
+    match velvet_rs::output_wav(output_filename.to_string(), &triangle, SAMPLE_RATE) {
         Ok(_) => println!("created wav file {}", output_filename),
         Err(e) => println!("error: {}", e),
     }

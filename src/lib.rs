@@ -3,8 +3,6 @@ use hound;
 use hound::Sample;
 use rand::Rng;
 
-const SAMPLE_RATE: u32 = 44_100;
-
 pub struct SparseVelvet {
     len: usize,
     // Vector of (pulse_location, pulse_type)
@@ -22,7 +20,6 @@ pub fn convolve_velvet(signal: &Vec<f32>, velvet: &SparseVelvet) -> Vec<f32>
 {
     println!("signal length: {} velvet length: {}", signal.len(), velvet.len);
     let mut output: Vec<f32> = vec![0.; signal.len() + velvet.len - 1];
-    println!("convolving");
     for n in 0..output.len() {
         for &(pulse_location, pulse_type) in velvet.pulses.iter() {
             let Some(index) = n.checked_sub(pulse_location) else {continue;};
@@ -115,11 +112,11 @@ where S: Sample,
         .collect());
 }
 
-pub fn output_wav(filename: String, buffer: &Vec<i16>) -> Result<(), hound::Error>
+pub fn output_wav(filename: String, buffer: &Vec<i16>, sample_rate: u32) -> Result<(), hound::Error>
 {
     let spec = hound::WavSpec {
         channels: 1,
-        sample_rate: SAMPLE_RATE,
+        sample_rate: sample_rate,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
