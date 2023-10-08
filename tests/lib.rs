@@ -1,7 +1,5 @@
 extern crate velvet_rs;
 
-use dasp::Sample;
-
 const SAMPLE_RATE: u32 = 44_100;
 
 fn approx_eq(v1: &Vec<f32>, v2: &Vec<f32>, epsilon: f32) -> bool {
@@ -19,10 +17,7 @@ fn approx_eq(v1: &Vec<f32>, v2: &Vec<f32>, epsilon: f32) -> bool {
 
 #[test]
 fn signal_velvet_equivalence() {
-    let s1 = velvet_rs::read_wav::<i16>("triangle.wav".to_string()).unwrap()
-        .iter()
-        .map(|&s| s.to_sample::<f32>())
-        .collect();
+    let s1 = velvet_rs::read_wav::<f32>("triangle.wav".to_string()).unwrap();
     let velvet = velvet_rs::gen_velvet((SAMPLE_RATE*7) as usize, 2205, SAMPLE_RATE);
     let s2 = velvet_rs::velvet_noise(&velvet);
     let fft_convolved = velvet_rs::convolve_fft(&s1, &s2);
@@ -70,4 +65,12 @@ fn wav_io() {
     }
     let triangle2: Vec<i16> = velvet_rs::read_wav("triangle2.wav".to_string()).unwrap();
     assert_eq!(triangle, triangle2);
+}
+
+#[test]
+fn normalization() {
+    let v: Vec<f32> = vec![1.0, 2.0, 4.0, 8.0, -1.0, -2.0, -4.0, -8.0];
+    let expected: Vec<f32> = vec![0.125, 0.25, 0.5, 1.0, -0.125, -0.25, -0.5, -1.0];
+    let normalized = velvet_rs::normalize(&v);
+    assert_eq!(normalized, expected);
 }

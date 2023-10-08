@@ -9,6 +9,7 @@ fn main() {
     let noise = velvet_rs::velvet_noise(&velvet);
     let triangle = velvet_rs::read_wav::<f32>("triangle.wav".to_string()).unwrap();
     let fft_convolved = velvet_rs::convolve_fft(&noise, &triangle);
+    let fft_convolved = velvet_rs::normalize(&fft_convolved);
     let fft_convolved = fft_convolved
         .iter()
         .map(|s| s.to_sample::<i16>())

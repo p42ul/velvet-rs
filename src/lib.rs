@@ -1,6 +1,6 @@
 use easyfft::{prelude::*, dyn_size::realfft::DynRealDft};
 use hound;
-use hound::Sample;
+use dasp::{Sample, sample::FromSample};
 use rand::Rng;
 
 pub struct SparseVelvet {
@@ -22,7 +22,7 @@ pub fn convolve_velvet(signal: &Vec<f32>, velvet: &SparseVelvet) -> Vec<f32>
     let mut output: Vec<f32> = vec![0.; signal.len() + velvet.len - 1];
     for n in 0..output.len() {
         for &(pulse_location, pulse_type) in velvet.pulses.iter() {
-            let Some(index) = n.checked_sub(pulse_location) else {continue;};
+            let Some(index) = n.checked_sub(pulse_location) else {break;};
             if index >= signal.len() {
                 continue;
             }
@@ -83,6 +83,21 @@ pub fn naive_convolve(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>
     output
 }
 
+pub fn normalize(v: &Vec<f32>) -> Vec<f32> {
+    let max = max_abs(&v);
+    v.iter()
+    .map(|e| e / max)
+    .collect()
+}
+
+fn max_abs(v: &Vec<f32>) -> f32 {
+    let mut result: f32 = 0.0;
+    for e in v {
+        result = result.max(e.abs());
+    }
+    result
+}
+
 pub fn convolve_fft(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>
 {
     let (big, small) = if s1.len() > s2.len() {
@@ -103,13 +118,13 @@ pub fn convolve_fft(s1: &Vec<f32>, s2: &Vec<f32>) -> Vec<f32>
 }
 
 pub fn read_wav<S>(filename: String) -> Result<Vec<S>, hound::Error>
-where S: Sample,
+where S: Sample + FromSample<i16>,
 {
     let mut reader = hound::WavReader::open(filename)?;
-    return Ok(reader
+    Ok(reader
         .samples()
-        .map(|s: Result<S, hound::Error>| s.unwrap())
-        .collect());
+        .map(|s: Result<i16, hound::Error>| s.unwrap().to_sample::<S>())
+        .collect())
 }
 
 pub fn output_wav(filename: String, buffer: &Vec<i16>, sample_rate: u32) -> Result<(), hound::Error>
