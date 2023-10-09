@@ -127,7 +127,8 @@ where S: Sample + FromSample<i16>,
         .collect())
 }
 
-pub fn output_wav(filename: String, buffer: &Vec<i16>, sample_rate: u32) -> Result<(), hound::Error>
+pub fn output_wav<S>(filename: String, buffer: &Vec<S>, sample_rate: u32) -> Result<(), hound::Error>
+where S: Sample, i16: FromSample<S>,
 {
     let spec = hound::WavSpec {
         channels: 1,
@@ -138,7 +139,7 @@ pub fn output_wav(filename: String, buffer: &Vec<i16>, sample_rate: u32) -> Resu
     let mut writer = hound::WavWriter::create(filename, spec)?;
 
     for &sample in buffer.iter() {
-        writer.write_sample(sample)?;
+        writer.write_sample(sample.to_sample::<i16>())?;
     }
 
     writer.finalize()

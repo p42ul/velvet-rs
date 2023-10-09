@@ -69,8 +69,8 @@ fn wav_io() {
 
 #[test]
 fn normalization() {
-    let v: Vec<f32> = vec![1.0, 2.0, 4.0, 8.0, -1.0, -2.0, -4.0, -8.0];
-    let expected: Vec<f32> = vec![0.125, 0.25, 0.5, 1.0, -0.125, -0.25, -0.5, -1.0];
+    let v: Vec<f32> = vec![1.0, 2.0, 4.0, 8.0, 0.0, -1.0, -2.0, -4.0, -8.0];
+    let expected: Vec<f32> = vec![0.125, 0.25, 0.5, 1.0, 0.0, -0.125, -0.25, -0.5, -1.0];
     let normalized = velvet_rs::normalize(&v);
     assert_eq!(normalized, expected);
 }
