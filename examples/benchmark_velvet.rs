@@ -9,16 +9,16 @@ fn main() {
     let triangle = velvet_rs::read_wav::<f32>("triangle.wav".to_string()).unwrap();
     let velvet = velvet_rs::gen_velvet((SAMPLE_RATE*7) as usize, 2205, SAMPLE_RATE);
     let noise = velvet_rs::velvet_noise(&velvet);
-    println!("convolve_velvet");
+    println!("convolve_fft");
     timeit!({
-        let _ = velvet_rs::convolve_velvet(&triangle, &velvet);
+        let _ = velvet_rs::convolve_fft(&noise, &triangle);
     });
     println!("convolve_velvet_parallel");
     timeit!({
         let _ = velvet_rs::convolve_velvet_parallel(&triangle, &velvet);
     });
-    println!("convolve_fft");
+    println!("convolve_velvet");
     timeit!({
-        let _ = velvet_rs::convolve_fft(&noise, &triangle);
+        let _ = velvet_rs::convolve_velvet(&triangle, &velvet);
     });
 }
