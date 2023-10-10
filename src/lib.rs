@@ -1,5 +1,3 @@
-use std::sync::mpsc::channel;
-
 use dasp::{Sample, sample::FromSample};
 use easyfft::{prelude::*, dyn_size::realfft::DynRealDft};
 use hound;
@@ -14,7 +12,6 @@ pub struct SparseVelvet {
     pulses: Vec<(usize, bool)>,
 }
 
-type VelvetPulse = (usize, f32);
 
 pub fn white_noise(len: usize) -> Vec<f32>
 {
@@ -24,27 +21,43 @@ pub fn white_noise(len: usize) -> Vec<f32>
 
 pub fn convolve_velvet(signal: &Vec<f32>, velvet: &SparseVelvet) -> Vec<f32>
 {
-    let (sender, receiver) = channel::<VelvetPulse>();
-    let output_len = signal.len() + velvet.len - 1;
-    let _ = (0..output_len).into_par_iter()
-    .map_with(sender, |s, n| {
+    let mut output: Vec<f32> = vec![0.; signal.len() + velvet.len - 1];
+    for n in 0..output.len() {
         for &(pulse_location, pulse_type) in velvet.pulses.iter() {
             let Some(index) = n.checked_sub(pulse_location) else {break;};
             if index >= signal.len() {
                 continue;
             }
             match pulse_type {
-                true =>  s.send((n, signal[index])).unwrap(),
-                false => s.send((n, -signal[index])).unwrap(),
+                true =>  output[n] += signal[index],
+                false => output[n] -= signal[index],
             };
         }
-    });
-    let mut output: Vec<f32> = vec![0.; signal.len() + velvet.len - 1];
-    let _ = receiver.iter()
-    .map(|(n, sig)| {
-        println!("receiving {:?}", n);
-        output[n] += sig;
-    });
+    }
+    output
+}
+
+pub fn convolve_velvet_parallel(signal: &Vec<f32>, velvet: &SparseVelvet) -> Vec<f32>
+{
+    let output_len = signal.len() + velvet.len - 1;
+    let output: Vec<f32> = vec![0.0; output_len];
+    let output: Vec<f32> = output.into_par_iter()
+    .enumerate()
+    .update(
+        |(i, n)| {
+        for &(pulse_location, pulse_type) in velvet.pulses.iter() {
+            let Some(index) = i.checked_sub(pulse_location) else {break;};
+            if index >= signal.len() {
+                continue;
+            }
+            match pulse_type {
+                true =>  *n += signal[index],
+                false => *n -= signal[index],
+            };
+        }
+    })
+    .map(|(_i, n)| { n })
+    .collect();
     output
 }
 

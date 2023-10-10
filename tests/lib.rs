@@ -17,11 +17,11 @@ fn approx_eq(v1: &Vec<f32>, v2: &Vec<f32>, epsilon: f32) -> bool {
 
 #[test]
 fn signal_velvet_equivalence() {
-    let s1 = velvet_rs::read_wav::<f32>("triangle.wav".to_string()).unwrap();
+    let signal = velvet_rs::read_wav::<f32>("triangle.wav".to_string()).unwrap();
     let velvet = velvet_rs::gen_velvet((SAMPLE_RATE*7) as usize, 2205, SAMPLE_RATE);
-    let s2 = velvet_rs::velvet_noise(&velvet);
-    let fft_convolved = velvet_rs::convolve_fft(&s1, &s2);
-    let velvet_convolved = velvet_rs::convolve_velvet(&s1, &velvet);
+    let noise = velvet_rs::velvet_noise(&velvet);
+    let fft_convolved = velvet_rs::convolve_fft(&signal, &noise);
+    let velvet_convolved = velvet_rs::convolve_velvet_parallel(&signal, &velvet);
     assert!(approx_eq(&fft_convolved, &velvet_convolved, 1e-5));
 }
 
@@ -31,7 +31,7 @@ fn naive_velvet_equivalence() {
     let velvet = velvet_rs::gen_velvet(100, 10, 100);
     let s2 = velvet_rs::velvet_noise(&velvet);
     let naive_convolved = velvet_rs::naive_convolve(&s1, &s2);
-    let velvet_convolved = velvet_rs::convolve_velvet(&s1, &velvet);
+    let velvet_convolved = velvet_rs::convolve_velvet_parallel(&s1, &velvet);
     assert_eq!(naive_convolved, velvet_convolved);
 }
 
@@ -51,7 +51,7 @@ fn fft_velvet_equivalence() {
     let s1: Vec<f32> = vec![1., 2., 3.,];
     let velvet = velvet_rs::gen_velvet(100, 10, 100);
     let fft_convolved = velvet_rs::convolve_fft(&s1, &velvet_rs::velvet_noise(&velvet));
-    let velvet_convolved = velvet_rs::convolve_velvet(&s1, &velvet);
+    let velvet_convolved = velvet_rs::convolve_velvet_parallel(&s1, &velvet);
     assert!(approx_eq(&fft_convolved, &velvet_convolved, 1e-6));
 }
 
@@ -73,4 +73,13 @@ fn normalization() {
     let expected: Vec<f32> = vec![0.125, 0.25, 0.5, 1.0, 0.0, -0.125, -0.25, -0.5, -1.0];
     let normalized = velvet_rs::normalize(&v);
     assert_eq!(normalized, expected);
+}
+
+#[test]
+fn velvet_parallel_equivalence() {
+    let s1: Vec<f32> = vec![1., 2., 3.,];
+    let velvet = velvet_rs::gen_velvet(100, 10, 100);
+    let velvet_convolved = velvet_rs::convolve_velvet(&s1, &velvet);
+    let velvet_parallel_convolved = velvet_rs::convolve_velvet_parallel(&s1, &velvet);
+    assert_eq!(velvet_convolved, velvet_parallel_convolved);
 }
