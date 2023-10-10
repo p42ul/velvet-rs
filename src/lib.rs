@@ -1,7 +1,11 @@
+use std::sync::mpsc::channel;
+
+use dasp::{Sample, sample::FromSample};
 use easyfft::{prelude::*, dyn_size::realfft::DynRealDft};
 use hound;
-use dasp::{Sample, sample::FromSample};
 use rand::Rng;
+use rayon::prelude::*;
+
 
 pub struct SparseVelvet {
     len: usize,
@@ -9,6 +13,8 @@ pub struct SparseVelvet {
     // Pulse locations are monotonically increasing
     pulses: Vec<(usize, bool)>,
 }
+
+type VelvetPulse = (usize, f32);
 
 pub fn white_noise(len: usize) -> Vec<f32>
 {
@@ -18,20 +24,27 @@ pub fn white_noise(len: usize) -> Vec<f32>
 
 pub fn convolve_velvet(signal: &Vec<f32>, velvet: &SparseVelvet) -> Vec<f32>
 {
-    println!("signal length: {} velvet length: {}", signal.len(), velvet.len);
-    let mut output: Vec<f32> = vec![0.; signal.len() + velvet.len - 1];
-    for n in 0..output.len() {
+    let (sender, receiver) = channel::<VelvetPulse>();
+    let output_len = signal.len() + velvet.len - 1;
+    let _ = (0..output_len).into_par_iter()
+    .map_with(sender, |s, n| {
         for &(pulse_location, pulse_type) in velvet.pulses.iter() {
             let Some(index) = n.checked_sub(pulse_location) else {break;};
             if index >= signal.len() {
                 continue;
             }
             match pulse_type {
-                true =>  output[n] += signal[index],
-                false => output[n] -= signal[index],
+                true =>  s.send((n, signal[index])).unwrap(),
+                false => s.send((n, -signal[index])).unwrap(),
             };
         }
-    }
+    });
+    let mut output: Vec<f32> = vec![0.; signal.len() + velvet.len - 1];
+    let _ = receiver.iter()
+    .map(|(n, sig)| {
+        println!("receiving {:?}", n);
+        output[n] += sig;
+    });
     output
 }
 
