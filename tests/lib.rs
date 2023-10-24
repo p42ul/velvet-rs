@@ -8,7 +8,7 @@ fn approx_eq(v1: &Vec<f32>, v2: &Vec<f32>, epsilon: f32) -> bool {
     }
     let mut largest: f32 = 0.0;
     for i in 0..v1.len() {
-        let delta = v1[i] - v2[i];
+        let delta = (v1[i] - v2[i]).abs();
         largest = largest.max(delta);
     }
     println!("largest delta: {}", largest);
